@@ -296,6 +296,7 @@ class EmulatorJS {
             core: new window.EJS_STORAGE("EmulatorJS-core", "core"),
             states: new window.EJS_STORAGE("EmulatorJS-states", "states")
         }
+        this.supportsWebgl2 = !!document.createElement('canvas').getContext('webgl2');
         
         this.game.classList.add("ejs_game");
         if (typeof this.config.backgroundImg === "string") {
@@ -637,20 +638,25 @@ class EmulatorJS {
                 this.initGameCore(js, wasm, thread);
             });
         }
-        this.storage.core.get(this.getCore()+'-wasm.data').then((result) => {
+        let filename = this.getCore()+(this.config.threads ? "-thread" : "")+(this.supportsWebgl2 ? "" : "-legacy")+"-wasm.data";
+        this.storage.core.get(filename).then((result) => {
             if (result && result.version === this.version && !this.debug) {
                 gotCore(result.data);
                 return;
             }
-            let corePath = 'cores/'+this.getCore()+(this.config.threads ? "-thread" : "")+'-wasm.data';
+            let corePath = 'cores/'+filename;
             this.downloadFile(corePath, (res) => {
                 if (res === -1) {
-                    this.textElem.innerText = this.localization('Network Error');
+                    if (!this.supportsWebgl2) {
+                        this.textElem.innerText = this.localization('Outdated graphics driver');
+                    } else {
+                        this.textElem.innerText = this.localization('Network Error');
+                    }
                     this.textElem.style.color = "red";
                     return;
                 }
                 gotCore(res.data);
-                this.storage.core.put(this.getCore()+'-wasm.data', {
+                this.storage.core.put(filename, {
                     version: this.version,
                     data: res.data
                 });
