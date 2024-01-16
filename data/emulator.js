@@ -84,6 +84,9 @@ class EmulatorJS {
             'amiga': 'puae',
             'c64': 'vice_x64'
         }
+        if (this.isSafari && this.isMobile && this.getCore(true) === "n64") {
+            return "parallel_n64";
+        }
         return options[core] || core;
     }
     extensions = {
