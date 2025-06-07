@@ -933,6 +933,7 @@ class EmulatorJS {
             preRun: [],
             postRun: [],
             canvas: this.canvas,
+            callbacks: {},
             parent: this.elements.parent,
             print: (msg) => {
                 if (this.debug) {
@@ -1447,8 +1448,11 @@ class EmulatorJS {
 
         const qSave = addButton("Quick Save", false, () => {
             const slot = this.settings['save-state-slot'] ? this.settings['save-state-slot'] : "1";
-            this.gameManager.quickSave(slot);
-            this.displayMessage(this.localization("SAVED STATE TO SLOT") + " " + slot);
+            if (this.gameManager.quickSave(slot)) {
+                this.displayMessage(this.localization("SAVED STATE TO SLOT") + " " + slot);
+            } else {
+                this.displayMessage(this.localization("FAILED TO SAVE STATE"));
+            }
             hideMenu();
         });
         const qLoad = addButton("Quick Load", false, () => {
@@ -1472,6 +1476,8 @@ class EmulatorJS {
                 }
             });
 
+            body.style.display = "flex";
+
             const menu = this.createElement('div');
             body.appendChild(menu);
             menu.classList.add("ejs_list_selector");
@@ -1483,7 +1489,7 @@ class EmulatorJS {
                 if (functi0n instanceof Function) {
                     this.addEventListener(li, 'click', (e) => {
                         e.preventDefault();
-                        functi0n();
+                        functi0n(li);
                     });
                 }
                 a.href = "#";
@@ -1507,7 +1513,6 @@ class EmulatorJS {
             body.appendChild(retroarch);
             body.appendChild(coreLicense);
 
-            let current = home;
             home.innerText = "EmulatorJS v" + this.ejs_version;
             home.appendChild(this.createElement("br"));
             home.appendChild(this.createElement("br"));
@@ -1515,6 +1520,7 @@ class EmulatorJS {
             home.classList.add("ejs_context_menu_tab");
             license.classList.add("ejs_context_menu_tab");
             retroarch.classList.add("ejs_context_menu_tab");
+            coreLicense.classList.add("ejs_context_menu_tab");
 
             this.createLink(home, "https://github.com/EmulatorJS/EmulatorJS", "View on GitHub", true);
 
@@ -1538,29 +1544,33 @@ class EmulatorJS {
 
             home.appendChild(this.createElement("br"));
             menu.appendChild(parent);
-            const setElem = (element) => {
+            let current = home;
+            const setElem = (element, li) => {
                 if (current === element) return;
                 if (current) {
                     current.style.display = "none";
                 }
+                let activeLi = li.parentElement.querySelector(".ejs_active_list_element");
+                if (activeLi) {
+                    activeLi.classList.remove("ejs_active_list_element");
+                }
+                li.classList.add("ejs_active_list_element");
                 current = element;
                 element.style.display = "";
             }
-            addButton("Home", false, () => {
-                setElem(home);
-            })
-            addButton("EmulatorJS License", false, () => {
-                setElem(license);
-            })
-            addButton("RetroArch License", false, () => {
-                setElem(retroarch);
-            })
+            addButton("Home", false, (li) => {
+                setElem(home, li);
+            }).classList.add("ejs_active_list_element");
+            addButton("EmulatorJS License", false, (li) => {
+                setElem(license, li);
+            });
+            addButton("RetroArch License", false, (li) => {
+                setElem(retroarch, li);
+            });
             if (this.coreName && this.license) {
-                addButton(this.coreName + " License", false, () => {
-                    setElem(coreLicense);
+                addButton(this.coreName + " License", false, (li) => {
+                    setElem(coreLicense, li);
                 })
-                coreLicense.style['text-align'] = "center";
-                coreLicense.style['padding'] = "10px";
                 coreLicense.innerText = this.license;
             }
             //Todo - Contributors.
@@ -1851,7 +1861,13 @@ class EmulatorJS {
 
         let stateUrl;
         const saveState = addButton(this.config.buttonOpts.saveState, async () => {
-            const state = this.gameManager.getState();
+            let state;
+            try {
+                state = this.gameManager.getState();
+            } catch(e) {
+                this.displayMessage(this.localization("FAILED TO SAVE STATE"));
+                return;
+            }
             const called = this.callEvent("saveState", {
                 screenshot: await this.gameManager.screenshot(),
                 state: state
@@ -2784,7 +2800,6 @@ class EmulatorJS {
             const playerTitle = this.createElement("div");
 
             const gamepadTitle = this.createElement("div");
-            gamepadTitle.style = "font-size:12px;";
             gamepadTitle.innerText = this.localization("Connected Gamepad") + ": ";
 
             const gamepadName = this.createElement("select");
@@ -2814,6 +2829,7 @@ class EmulatorJS {
             def.innerText = "Not Connected";
             gamepadName.appendChild(def);
             gamepadTitle.appendChild(gamepadName);
+            gamepadTitle.classList.add("ejs_gamepad_section");
 
             const leftPadding = this.createElement("div");
             leftPadding.style = "width:25%;float:left;";
@@ -4119,6 +4135,25 @@ class EmulatorJS {
         }
         return null;
     }
+    getCoreSettings() {
+        if (!window.localStorage || this.config.disableLocalStorage) return;
+        let coreSpecific = localStorage.getItem(this.getLocalStorageKey());
+        if (coreSpecific) {
+            try {
+                coreSpecific = JSON.parse(coreSpecific);
+                if (!(coreSpecific.settings instanceof Object)) throw new Error("Not a JSON object");
+                let rv = "";
+                for (const k in coreSpecific.settings) {
+                    let value = isNaN(coreSpecific.settings[k]) ? `"${coreSpecific.settings[k]}"` : coreSpecific.settings[k];
+                    rv += `${k} = ${value}\n`;
+                }
+                return rv;
+            } catch(e) {
+                console.warn("Could not load previous settings", e);
+            }
+        }
+        return "";
+    }
     loadSettings() {
         if (!window.localStorage || this.config.disableLocalStorage) return;
         this.settingsLoaded = true;
@@ -4239,6 +4274,8 @@ class EmulatorJS {
             this.createBottomMenuBarListeners();
         } else if (option === "keyboardInput") {
             this.gameManager.setKeyboardEnabled(value === "enabled");
+        } else if (option === "altKeyboardInput") {
+            this.gameManager.setAltKeyEnabled(value === "enabled");
         } else if (option === "lockMouse") {
             this.enableMouseLock = (value === "enabled");
         }
@@ -4577,7 +4614,7 @@ class EmulatorJS {
                 return;
             }
             parentElement = parentElement || home;
-            const transitionElement = useParentParent ? parentElement.parentElement.parentElement : parentElement.parentElement;
+            const transitionElement = useParentParent ? parentElement.parentElement.parentElement : parentElement;
             const menuOption = this.createElement("div");
             menuOption.classList.add("ejs_settings_main_bar");
             const span = this.createElement("span");
@@ -4602,7 +4639,7 @@ class EmulatorJS {
 
             const button = this.createElement("button");
             const goToHome = () => {
-                parentElement.parentElement.parentElement.removeAttribute("hidden");
+                transitionElement.removeAttribute("hidden");
                 menu.setAttribute("hidden", "");
                 const homeSize = this.getElementSize(transitionElement);
                 nested.style.width = (homeSize.width + 20) + "px";
@@ -4615,7 +4652,7 @@ class EmulatorJS {
                 nested.style.height = targetSize.height + "px";
                 menu.removeAttribute("hidden");
                 optionsMenu.scrollTo(0, 0);
-                parentElement.parentElement.parentElement.setAttribute("hidden", "");
+                transitionElement.setAttribute("hidden", "");
                 transitionElement.setAttribute("hidden", "");
             })
             this.addEventListener(button, "click", goToHome);
@@ -4794,6 +4831,11 @@ class EmulatorJS {
             "disabled": this.localization("Disabled"),
             "enabled": this.localization("Enabled"),
         }, ((this.defaultCoreOpts && this.defaultCoreOpts.useKeyboard === true) ? "enabled" : "disabled"), inputOptions, true);
+
+        addToMenu(this.localization("Forward Alt key"), "altKeyboardInput", {
+            "disabled": this.localization("Disabled"),
+            "enabled": this.localization("Enabled"),
+        }, "disabled", inputOptions, true);
 
         addToMenu(this.localization("Lock Mouse"), "lockMouse", {
             "disabled": this.localization("Disabled"),
