@@ -5227,7 +5227,7 @@ class EmulatorJS {
         }
         let allOpts = {};
 
-        const addToMenu = (title, id, options, defaultOption, parentElement, useParentParent) => {
+        const addToMenu = (title, id, options, defaultOption, parentElement, useParentParent, info) => {
             if (Array.isArray(this.config.hideSettings) && this.config.hideSettings.includes(id)) {
                 return;
             }
@@ -5235,6 +5235,7 @@ class EmulatorJS {
             const transitionElement = useParentParent ? parentElement.parentElement.parentElement : parentElement;
             const menuOption = this.createElement("div");
             menuOption.classList.add("ejs_settings_main_bar");
+            if (info) menuOption.title = info;
             const span = this.createElement("span");
             span.innerText = title;
 
@@ -5637,12 +5638,34 @@ class EmulatorJS {
             checkForEmptyMenu(virtualGamepad);
         }
 
-        let coreOpts;
+        let coreOptsJSON;
         try {
-            coreOpts = this.gameManager.getCoreOptions();
+            coreOptsJSON = this.gameManager.getCoreOptionsJSON();
         } catch(e) {}
-        if (coreOpts) {
-            const coreOptions = createSettingParent(true, "Backend Core Options", home);
+        let coreOpts;
+        if (!coreOptsJSON) {
+            try {
+                coreOpts = this.gameManager.getCoreOptions();
+            } catch(e) {}
+        }
+        if (coreOptsJSON) {
+            const coreOptions = createSettingParent(true, "Core Options", home);
+            coreOptsJSON.options.forEach(option => {
+                if (option.visible === false || option.values.length <= 1) return;
+                const availableOptions = {};
+                option.values.forEach(value => {
+                    availableOptions[value.value] = this.localization(value.label, this.config.settingsLanguage);
+                });
+                addToMenu(this.localization(option.desc || option.key, this.config.settingsLanguage),
+                    option.key, availableOptions,
+                    option.current || option.default,
+                    coreOptions,
+                    true,
+                    option.info ? this.localization(option.info, this.config.settingsLanguage) : null);
+            })
+            checkForEmptyMenu(coreOptions);
+        } else if (coreOpts) {
+            const coreOptions = createSettingParent(true, "Core Options", home);
             coreOpts.split("\n").forEach((line, index) => {
                 let option = line.split("; ");
                 let name = option[0];

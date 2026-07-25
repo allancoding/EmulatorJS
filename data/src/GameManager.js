@@ -11,6 +11,7 @@ class EJS_GameManager {
             simulateInput: this.Module.cwrap("simulate_input", "null", ["number", "number", "number"]),
             toggleMainLoop: this.Module.cwrap("toggleMainLoop", "null", ["number"]),
             getCoreOptions: this.Module.cwrap("get_core_options", "string", []),
+            getCoreOptionsJSON: this.Module.cwrap("get_core_options_json", "string", []),
             setVariable: this.Module.cwrap("ejs_set_variable", "null", ["string", "string"]),
             setCheat: this.Module.cwrap("set_cheat", "null", ["number", "number", "string"]),
             resetCheat: this.Module.cwrap("reset_cheat", "null", []),
@@ -398,6 +399,19 @@ IF EXIST AUTORUN.BAT CALL AUTORUN.BAT
     }
     getCoreOptions() {
         return this.functions.getCoreOptions();
+    }
+    // Core options with the data the libretro core options v2 interface provides:
+    // human readable descriptions, value labels, info text and visibility.
+    // Returns null on cores built before get_core_options_json was exported.
+    getCoreOptionsJSON() {
+        if (!this.Module["_get_core_options_json"]) return null;
+        try {
+            const data = JSON.parse(this.functions.getCoreOptionsJSON());
+            return (data && Array.isArray(data.options) && data.options.length) ? data : null;
+        } catch(e) {
+            if (this.EJS.debug) console.warn("Failed to read core options:", e);
+            return null;
+        }
     }
     setVariable(option, value) {
         this.functions.setVariable(option, value);
