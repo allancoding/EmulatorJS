@@ -15,6 +15,7 @@ assignees: ''
 - [ ] I am on the latest version of EmulatorJS
 - [ ] I have not attached any images or logs via external sites. I have uploaded them straight to GitHub and acknowledge that external sites may pose a security issue.
 - [ ] I have included, **IN DETAIL**, the steps to reproduce the bug.
+- [ ] I am not an LLM/Ai. Bug reports filed by ai will be closed. Just type out the issue yourself it's not that hard
 
 <!-- 
 To collect a log of the console.
@@ -24,7 +25,7 @@ EJS_DEBUG_XX = true;
 ```
 2. Right click and click `inspect`.
 3. Select the `console` tab at the top.
-4. then reload the broken page.
+4. then reload the broken page and start EmulatorJS
 5. Right click on the console and click `Save as...`
 6. Upload it to your issue.
  -->
